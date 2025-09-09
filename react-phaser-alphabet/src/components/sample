@@ -1,0 +1,625 @@
+import React, { useEffect, useRef } from 'react';
+import Phaser from 'phaser';
+//import clickSound from '../assets/sounds/click.mp3';
+
+const PhaserGame = () => {
+  const gameRef = useRef(null);
+
+  useEffect(() => {
+    if (gameRef.current) return;
+
+    class LetterScene extends Phaser.Scene {
+      constructor() {
+        super('LetterScene');
+        this.letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        this.currentIndex = 0;
+        this.clickCount = 0;
+        this.maxRepeats = 5;
+        this.letterSprites = [];
+      }
+
+      preload() {
+        // Dynamically import all letter images using import.meta.glob
+        const letterImages = import.meta.glob('../assets/letters/*.png', { eager: true });
+        this.letterMap = {};
+
+        for (const path in letterImages) {
+          const match = path.match(/\/([A-Z])\.png$/);
+          if (match) {
+            const letter = match[1];
+            this.letterMap[letter] = letterImages[path].default;
+            this.load.image(letter, this.letterMap[letter]);
+          }
+        }
+
+        //this.load.audio('click', clickSound);
+      }
+
+      create() {
+        //this.sound.add('click');
+        this.matter.world.setBounds().disableGravity();
+
+        // Create a movable player (red circle)
+        this.player = this.matter.add.circle(400, 550, 20, {
+          isStatic: false,
+          restitution: 0.9,
+          frictionAir: 0.01,
+        });
+
+        this.playerGraphics = this.add.graphics({ fillStyle: { color: 0xff0000 } });
+        this.input.keyboard.on('keydown', (e) => {
+          const speed = 5;
+          if (e.code === 'ArrowLeft') this.matter.body.translate(this.player, { x: -speed, y: 0 });
+          if (e.code === 'ArrowRight') this.matter.body.translate(this.player, { x: speed, y: 0 });
+          if (e.code === 'ArrowUp') this.matter.body.translate(this.player, { x: 0, y: -speed });
+          if (e.code === 'ArrowDown') this.matter.body.translate(this.player, { x: 0, y: speed });
+
+        });
+
+        this.spawnLetter();
+      }
+
+      spawnLetter() {
+        // Clean up existing letters
+        this.letterSprites.forEach(sprite => sprite.destroy());
+        this.letterSprites = [];
+
+        if (this.currentIndex >= this.letters.length) {
+          this.add.text(300, 250, 'All letters done!', { fontSize: '32px', color: '#fff' });
+          return;
+        }
+
+        const letter = this.letters[this.currentIndex];
+        this.clickCount = 0;
+
+        for (let i = 0; i < this.maxRepeats; i++) {
+          const x = Phaser.Math.Between(100, 700);
+          const y = Phaser.Math.Between(50, 400);
+          const velocityX = Phaser.Math.Between(-5, 5);
+          const velocityY = Phaser.Math.Between(-3, 3);
+
+          const letterImage = this.matter.add.image(x, y, letter)
+            .setCircle(48)
+            .setBounce(1)
+            .setFriction(0)
+            .setFrictionAir(0)
+            .setScale(0.2)
+            .setVelocity(velocityX, velocityY)
+            .setInteractive();
+
+          letterImage.on('pointerdown', () => {
+            this.sound.play('click');
+            letterImage.destroy();
+            this.clickCount++;
+
+            if (this.clickCount >= this.maxRepeats) {
+              this.currentIndex++;
+              this.spawnLetter();
+            }
+          });
+
+          this.letterSprites.push(letterImage);
+        }
+      }
+
+      update() {
+        // Redraw player
+        this.playerGraphics.clear();
+        this.playerGraphics.fillCircle(this.player.position.x, this.player.position.y, 20);
+      }
+    }
+
+    gameRef.current = new Phaser.Game({
+      type: Phaser.AUTO,
+      width: 800,
+      height: 600,
+      backgroundColor: '#1a1a1a',
+      parent: 'phaser-container',
+      scene: LetterScene,
+      physics: {
+        default: 'matter',
+        matter: {
+          debug: false,
+        },
+      },
+    });
+
+    return () => {
+      if (gameRef.current) {
+        gameRef.current.destroy(true);
+        gameRef.current = null;
+      }
+    };
+  }, []);
+
+  return <div id="phaser-container" />;
+};
+
+export default PhaserGame;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import React, { useEffect, useRef } from 'react';
+// import * as Phaser from 'phaser';
+
+// const LetterCollectorGame = () => {
+//   const gameRef = useRef(null);
+
+//   useEffect(() => {
+//     if (gameRef.current) return;
+
+//     // Helper function to convert PCM audio to a WAV Blob
+//     const pcmToWav = (pcmData, sampleRate) => {
+//       const buffer = new ArrayBuffer(44 + pcmData.length * 2);
+//       const view = new DataView(buffer);
+//       const writeString = (view, offset, string) => {
+//         for (let i = 0; i < string.length; i++) {
+//           view.setUint8(offset + i, string.charCodeAt(i));
+//         }
+//       };
+
+//       writeString(view, 0, 'RIFF'); // RIFF identifier
+//       view.setUint32(4, 36 + pcmData.length * 2, true); // file length
+//       writeString(view, 8, 'WAVE'); // RIFF type
+//       writeString(view, 12, 'fmt '); // format chunk identifier
+//       view.setUint32(16, 16, true); // format chunk length
+//       view.setUint16(20, 1, true); // sample format (1 = PCM)
+//       view.setUint16(22, 1, true); // number of channels
+//       view.setUint32(24, sampleRate, true); // sample rate
+//       view.setUint32(28, sampleRate * 2, true); // byte rate
+//       view.setUint16(32, 2, true); // block align
+//       view.setUint16(34, 16, true); // bits per sample
+//       writeString(view, 36, 'data'); // data chunk identifier
+//       view.setUint32(40, pcmData.length * 2, true); // data chunk length
+
+//       let offset = 44;
+//       for (let i = 0; i < pcmData.length; i++) {
+//         view.setInt16(offset, pcmData[i], true);
+//         offset += 2;
+//       }
+
+//       return new Blob([view], { type: 'audio/wav' });
+//     };
+
+//     // Helper function to decode base64 string to ArrayBuffer
+//     const base64ToArrayBuffer = (base64) => {
+//       const binaryString = atob(base64);
+//       const len = binaryString.length;
+//       const bytes = new Uint8Array(len);
+//       for (let i = 0; i < len; i++) {
+//         bytes[i] = binaryString.charCodeAt(i);
+//       }
+//       return bytes.buffer;
+//     };
+
+//     class LetterScene extends Phaser.Scene {
+//       constructor() {
+//         super('LetterScene');
+//         this.letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+//         this.currentIndex = 0;
+//         this.clickCount = 0;
+//         this.score = 0;
+//         this.maxRepeats = 5;
+//         this.letterSprites = [];
+//         this.scoreText = null;
+//         this.player = null;
+//         this.currentLetter = null;
+//       }
+
+//       preload() {
+//         // Load the single letter sprite sheet from a public URL
+//         this.load.spritesheet('letters', 'https://labs.phaser.io/assets/sprites/letters.png', {
+//           frameWidth: 64,
+//           frameHeight: 64
+//         });
+//       }
+
+//       create() {
+//         this.matter.world.setBounds().disableGravity();
+//         this.matter.world.setGravity(0, 0);
+
+//         // Map letters to their corresponding frame in the sprite sheet
+//         this.letterFrames = {};
+//         for (let i = 0; i < this.letters.length; i++) {
+//           this.letterFrames[this.letters[i]] = i;
+//         }
+
+//         // Create a simple red square sprite for the player
+//         const playerGraphics = this.add.graphics({ fillStyle: { color: 0xff0000 } });
+//         playerGraphics.fillRect(0, 0, 40, 40);
+//         playerGraphics.generateTexture('player_sprite', 40, 40);
+//         playerGraphics.destroy();
+//         this.player = this.matter.add.sprite(400, 550, 'player_sprite', 0, {
+//           isStatic: false,
+//           restitution: 0.8,
+//           frictionAir: 0.1,
+//           label: 'player'
+//         });
+
+//         // Set up keyboard input for player movement
+//         this.cursors = this.input.keyboard.createCursorKeys();
+
+//         // Display the score
+//         this.scoreText = this.add.text(10, 10, 'Score: 0', {
+//           fontSize: '32px',
+//           color: '#fff'
+//         });
+
+//         // Add collision event listener
+//         this.matter.world.on('collisionstart', (event, bodyA, bodyB) => {
+//           if ((bodyA.label === 'player' && bodyB.label === 'letter') || (bodyA.label === 'letter' && bodyB.label === 'player')) {
+//             const letterBody = bodyA.label === 'letter' ? bodyA : bodyB;
+//             const letterSprite = letterBody.gameObject;
+
+//             if (letterSprite && letterSprite.getData('letter') === this.currentLetter) {
+//               this.score += 10;
+//               this.scoreText.setText(`Score: ${this.score}`);
+//               this.playLetterSound(this.currentLetter);
+//               letterSprite.destroy();
+//               this.clickCount++;
+
+//               if (this.clickCount >= this.maxRepeats) {
+//                 this.currentIndex++;
+//                 this.spawnLetter();
+//               }
+//             }
+//           }
+//         });
+
+//         this.spawnLetter();
+//       }
+
+//       // Function to make a TTS API call and play the audio
+//       async playLetterSound(letter) {
+//         const payload = {
+//           contents: [{
+//             parts: [{
+//               text: `Say the letter ${letter}`
+//             }]
+//           }],
+//           generationConfig: {
+//             responseModalities: ["AUDIO"],
+//             speechConfig: {
+//               voiceConfig: {
+//                 prebuiltVoiceConfig: {
+//                   voiceName: "Zephyr"
+//                 }
+//               }
+//             }
+//           },
+//           model: "gemini-2.5-flash-preview-tts"
+//         };
+
+//         const apiKey = "";
+//         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+//         try {
+//           const response = await fetch(apiUrl, {
+//             method: 'POST',
+//             headers: {
+//               'Content-Type': 'application/json'
+//             },
+//             body: JSON.stringify(payload)
+//           });
+
+//           if (!response.ok) {
+//             throw new Error(`API call failed with status: ${response.status}`);
+//           }
+
+//           const result = await response.json();
+//           const part = result?.candidates?.[0]?.content?.parts?.[0];
+//           const audioData = part?.inlineData?.data;
+//           const mimeType = part?.inlineData?.mimeType;
+
+//           if (audioData && mimeType && mimeType.startsWith("audio/")) {
+//             const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
+//             const pcmData = base64ToArrayBuffer(audioData);
+//             const pcm16 = new Int16Array(pcmData);
+//             const wavBlob = pcmToWav(pcm16, sampleRate);
+//             const audioUrl = URL.createObjectURL(wavBlob);
+//             const audio = new Audio(audioUrl);
+//             audio.play();
+//           } else {
+//             console.error("Invalid audio data from API.");
+//           }
+//         } catch (error) {
+//           console.error("Error generating or playing sound:", error);
+//         }
+//       }
+
+//       spawnLetter() {
+//         this.letterSprites.forEach(sprite => sprite.destroy());
+//         this.letterSprites = [];
+//         this.currentLetter = null;
+
+//         if (this.currentIndex >= this.letters.length) {
+//           this.add.text(300, 250, 'All letters done!', {
+//             fontSize: '32px',
+//             color: '#fff'
+//           });
+//           return;
+//         }
+
+//         const letter = this.letters[this.currentIndex];
+//         this.currentLetter = letter;
+//         this.clickCount = 0;
+
+//         for (let i = 0; i < this.maxRepeats; i++) {
+//           const x = Phaser.Math.Between(100, 700);
+//           const y = Phaser.Math.Between(50, 400);
+//           const velocityX = Phaser.Math.Between(-5, 5);
+//           const velocityY = Phaser.Math.Between(-3, 3);
+
+//           const letterSprite = this.matter.add.sprite(x, y, 'letters', this.letterFrames[letter], {
+//             label: 'letter',
+//             restitution: 1,
+//             frictionAir: 0,
+//             circle: {
+//               radius: 32
+//             }
+//           });
+//           letterSprite.setScale(0.5);
+//           letterSprite.setVelocity(velocityX, velocityY);
+//           letterSprite.setData('letter', letter);
+//           this.letterSprites.push(letterSprite);
+//         }
+//       }
+
+//       update() {
+//         const speed = 5;
+//         if (this.cursors.left.isDown) {
+//           this.player.setVelocityX(-speed);
+//         } else if (this.cursors.right.isDown) {
+//           this.player.setVelocityX(speed);
+//         } else {
+//           this.player.setVelocityX(0);
+//         }
+//         if (this.cursors.up.isDown) {
+//           this.player.setVelocityY(-speed);
+//         } else if (this.cursors.down.isDown) {
+//           this.player.setVelocityY(speed);
+//         } else {
+//           this.player.setVelocityY(0);
+//         }
+//       }
+//     }
+
+//     gameRef.current = new Phaser.Game({
+//       type: Phaser.AUTO,
+//       width: 800,
+//       height: 600,
+//       backgroundColor: '#1a1a1a',
+//       parent: 'phaser-container',
+//       scene: LetterScene,
+//       physics: {
+//         default: 'matter',
+//         matter: {
+//           debug: false,
+//           gravity: {
+//             y: 0
+//           }
+//         },
+//       },
+//     });
+
+//     return () => {
+//       if (gameRef.current) {
+//         gameRef.current.destroy(true);
+//         gameRef.current = null;
+//       }
+//     };
+//   }, []);
+
+//   return <div id="phaser-container" />;
+// };
+
+// export default LetterCollectorGame;
+
+// import React, { useEffect, useRef } from 'react';
+// import * as Phaser from 'phaser';
+
+// const LetterCollectorGame = () => {
+//   const gameRef = useRef(null);
+
+//   useEffect(() => {
+//     if (gameRef.current) return;
+
+//     class LetterScene extends Phaser.Scene {
+//       constructor() {
+//         super('LetterScene');
+//         this.letters = Array(5).fill('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')).flat(); // 5 full rounds
+//         this.currentIndex = 0;
+//         this.clickCount = 0;
+//         this.score = 0;
+//         this.maxRepeats = 5;
+//         this.letterSprites = [];
+//         this.scoreText = null;
+//         this.roundText = null;
+//         this.player = null;
+//         this.currentLetter = null;
+//       }
+
+//       preload() {
+//         // Load letter sprite sheet
+//         this.load.spritesheet('letters', 'https://labs.phaser.io/assets/sprites/letters.png', {
+//           frameWidth: 64,
+//           frameHeight: 64
+//         });
+
+//         // Load audio files for letters A–Z
+//         const uniqueLetters = [...new Set(this.letters)];
+//         for (let letter of uniqueLetters) {
+//           this.load.audio(letter, `assets/sounds/${letter}.mp3`);
+//         }
+//       }
+
+//       create() {
+//         this.matter.world.setBounds().disableGravity();
+//         this.matter.world.setGravity(0, 0);
+
+//         // Map letters to frame indices
+//         this.letterFrames = {};
+//         for (let i = 0; i < 26; i++) {
+//           const letter = String.fromCharCode(65 + i);
+//           this.letterFrames[letter] = i;
+//         }
+
+//         // Create red square player sprite
+//         const playerGraphics = this.add.graphics({ fillStyle: { color: 0xff0000 } });
+//         playerGraphics.fillRect(0, 0, 40, 40);
+//         playerGraphics.generateTexture('player_sprite', 40, 40);
+//         playerGraphics.destroy();
+
+//         this.player = this.matter.add.sprite(400, 550, 'player_sprite', 0, {
+//           isStatic: false,
+//           restitution: 0.8,
+//           frictionAir: 0.1,
+//           label: 'player'
+//         });
+
+//         // Keyboard input
+//         this.cursors = this.input.keyboard.createCursorKeys();
+
+//         // Score and round text
+//         this.scoreText = this.add.text(10, 10, 'Score: 0', {
+//           fontSize: '28px',
+//           color: '#ffffff'
+//         });
+
+//         this.roundText = this.add.text(10, 50, '', {
+//           fontSize: '24px',
+//           color: '#ffffff'
+//         });
+
+//         // Collision detection
+//         this.matter.world.on('collisionstart', (event, bodyA, bodyB) => {
+//           if (
+//             (bodyA.label === 'player' && bodyB.label === 'letter') ||
+//             (bodyA.label === 'letter' && bodyB.label === 'player')
+//           ) {
+//             const letterBody = bodyA.label === 'letter' ? bodyA : bodyB;
+//             const letterSprite = letterBody.gameObject;
+
+//             if (letterSprite && letterSprite.getData('letter') === this.currentLetter) {
+//               this.sound.play(this.currentLetter);
+//               this.score += 10;
+//               this.scoreText.setText(`Score: ${this.score}`);
+//               letterSprite.destroy();
+//               this.clickCount++;
+
+//               if (this.clickCount >= this.maxRepeats) {
+//                 this.currentIndex++;
+//                 this.spawnLetter();
+//               }
+//             }
+//           }
+//         });
+
+//         this.spawnLetter();
+//       }
+
+//       spawnLetter() {
+//         this.letterSprites.forEach(sprite => sprite.destroy());
+//         this.letterSprites = [];
+//         this.currentLetter = null;
+
+//         if (this.currentIndex >= this.letters.length) {
+//           this.add.text(300, 250, '🎉 All rounds completed!', {
+//             fontSize: '32px',
+//             color: '#fff'
+//           });
+//           return;
+//         }
+
+//         const letter = this.letters[this.currentIndex];
+//         this.currentLetter = letter;
+//         this.clickCount = 0;
+
+//         const round = Math.floor(this.currentIndex / 26) + 1;
+//         this.roundText.setText(`Round: ${round} / 5 | Letter: ${letter}`);
+
+//         for (let i = 0; i < this.maxRepeats; i++) {
+//           const x = Phaser.Math.Between(100, 700);
+//           const y = Phaser.Math.Between(50, 400);
+//           const velocityX = Phaser.Math.Between(-5, 5);
+//           const velocityY = Phaser.Math.Between(-3, 3);
+
+//           const letterSprite = this.matter.add.sprite(
+//             x,
+//             y,
+//             'letters',
+//             this.letterFrames[letter],
+//             {
+//               label: 'letter',
+//               restitution: 1,
+//               frictionAir: 0,
+//               circle: { radius: 32 }
+//             }
+//           );
+//           letterSprite.setScale(0.5);
+//           letterSprite.setVelocity(velocityX, velocityY);
+//           letterSprite.setData('letter', letter);
+//           this.letterSprites.push(letterSprite);
+//         }
+//       }
+
+//       update() {
+//         const speed = 5;
+//         if (this.cursors.left.isDown) {
+//           this.player.setVelocityX(-speed);
+//         } else if (this.cursors.right.isDown) {
+//           this.player.setVelocityX(speed);
+//         } else {
+//           this.player.setVelocityX(0);
+//         }
+
+//         if (this.cursors.up.isDown) {
+//           this.player.setVelocityY(-speed);
+//         } else if (this.cursors.down.isDown) {
+//           this.player.setVelocityY(speed);
+//         } else {
+//           this.player.setVelocityY(0);
+//         }
+//       }
+//     }
+
+//     gameRef.current = new Phaser.Game({
+//       type: Phaser.AUTO,
+//       width: 800,
+//       height: 600,
+//       backgroundColor: '#1a1a1a',
+//       parent: 'phaser-container',
+//       scene: LetterScene,
+//       physics: {
+//         default: 'matter',
+//         matter: {
+//           debug: false,
+//           gravity: { y: 0 }
+//         }
+//       }
+//     });
+
+//     return () => {
+//       if (gameRef.current) {
+//         gameRef.current.destroy(true);
+//         gameRef.current = null;
+//       }
+//     };
+//   }, []);
+
+//   return <div id="phaser-container" />;
+// };
+
+// export default LetterCollectorGame;
