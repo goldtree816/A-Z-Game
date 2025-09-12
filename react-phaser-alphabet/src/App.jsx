@@ -5,7 +5,7 @@ import './App.css'
 const App = () => {
   return (
     <div className='App'>
-      <h1>React + Phaser + Alphabets</h1>
+     {/* // <h1>React + Phaser + Alphabets</h1> */}
       <PhaserGame />
     </div>
   )
